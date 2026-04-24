@@ -1,0 +1,14 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.utils import config
+
+engine = create_engine(
+    config.DATABASE_URL,
+    connect_args={"sslmode": "require"}
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
