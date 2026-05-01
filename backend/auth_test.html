@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <div id="g_id_onload"
+         data-client_id="421982171275-c9kehfsf3bqob181u90gl1pip3c12fao.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse">
+    </div>
+
+    <div class="g_id_signin"></div>
+
+    <script>
+      console.log("Page loaded");
+
+      function handleCredentialResponse(response) {
+        console.log("Google callback fired");
+        console.log("Full response:", response);
+        console.log("Credential token:", response.credential);
+
+        fetch("http://localhost:8000/auth/google", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            id_token: response.credential
+          })
+        })
+        .then(async (res) => {
+          console.log("Backend status:", res.status);
+
+          const data = await res.json();
+          console.log("Backend response:", data);
+
+          return data;
+        })
+        .catch((error) => {
+          console.error("Fetch error:", error);
+        });
+      }
+    </script>
+  </body>
+</html>
