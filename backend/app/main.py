@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.jwt_middleware import jwt_middleware
-from app.api import location_router, auth_router
+from app.api import location_router, auth_router, plan_router
 
 app = FastAPI()
 app.add_middleware(
@@ -16,6 +16,7 @@ app.middleware("http")(jwt_middleware)
 
 app.include_router(location_router)
 app.include_router(auth_router)
+app.include_router(plan_router)
 
 @app.get("/")
 def root():

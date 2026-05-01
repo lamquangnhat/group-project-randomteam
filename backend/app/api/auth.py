@@ -24,6 +24,7 @@ def google_auth(
     req: TokenRequest,
     db: Session = Depends(get_db)
 ):
+    print(req.id_token)
     try:
         user_info = verify_google_token(req.id_token)
     except Exception:

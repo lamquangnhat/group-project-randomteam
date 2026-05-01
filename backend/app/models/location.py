@@ -20,6 +20,8 @@ class Location(Base):
     longitude = Column(Float)
 
     category = Column(String)
+    price_level = Column(Integer, nullable=True)  # 1=budget, 2=mid-range, 3=upscale, 4=luxury
+    tags = Column(String, nullable=True)  # comma-separated: "beach,tropical,family,outdoor"
 
     avg_rating = Column(Float, default=0)
     total_reviews = Column(Integer, default=0)

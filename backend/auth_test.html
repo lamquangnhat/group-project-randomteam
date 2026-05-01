@@ -11,7 +11,13 @@
     <div class="g_id_signin"></div>
 
     <script>
+      console.log("Page loaded");
+
       function handleCredentialResponse(response) {
+        console.log("Google callback fired");
+        console.log("Full response:", response);
+        console.log("Credential token:", response.credential);
+
         fetch("http://localhost:8000/auth/google", {
           method: "POST",
           headers: {
@@ -21,8 +27,17 @@
             id_token: response.credential
           })
         })
-        .then(res => res.json())
-        .then(data => console.log(data));
+        .then(async (res) => {
+          console.log("Backend status:", res.status);
+
+          const data = await res.json();
+          console.log("Backend response:", data);
+
+          return data;
+        })
+        .catch((error) => {
+          console.error("Fetch error:", error);
+        });
       }
     </script>
   </body>

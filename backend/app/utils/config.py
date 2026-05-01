@@ -12,4 +12,6 @@ class Config:
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET")
 
+    AI_API_KEY: str = os.getenv("AI_API_KEY")
+
 config = Config()
