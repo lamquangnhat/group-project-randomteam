@@ -4,7 +4,9 @@ from app.utils import config
 
 engine = create_engine(
     config.DATABASE_URL,
-    connect_args={"sslmode": "require"}
+    connect_args={"sslmode": "require"},
+    pool_pre_ping=True,
+    pool_recycle=300,
 )
 
 SessionLocal = sessionmaker(
