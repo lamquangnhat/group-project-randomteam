@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -6,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.models.location import Location
 from app.services.ai_service import extract_travel_intent, filter_locations_by_relevance
@@ -128,12 +131,14 @@ def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
     category: Optional[str] = intent.get("category")
     keywords: List[str] = intent.get("keywords") or []
 
+    logger.info("AI intent: category=%s, keywords=%s", category, keywords)
+
     # ── Step 2: query DB ──────────────────────────────────────────────────────
-    def _build_candidates(include_category: bool):
+    def _build_candidates(include_category: bool, require_keywords: bool):
         q = db.query(Location)
         if include_category and category:
             q = q.filter(Location.category == category)
-        if keywords:
+        if require_keywords and keywords:
             kw_filters = []
             for kw in keywords:
                 kw_filters.extend([
@@ -143,8 +148,7 @@ def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
                 ])
             q = q.filter(or_(*kw_filters))
         return (
-            q.filter(Location.total_reviews > 0)
-            .order_by(
+            q.order_by(
                 (Location.avg_rating * Location.total_reviews).desc(),
                 Location.avg_rating.desc(),
             )
@@ -152,21 +156,26 @@ def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
             .all()
         )
 
-    candidates = _build_candidates(include_category=True)
+    # Try strictest first: category + keywords
+    candidates = _build_candidates(include_category=True, require_keywords=True)
+    logger.info("Candidates (category+keywords): %d", len(candidates))
 
-    # Retry without category if too few results
+    # Relax keywords if too few
+    if len(candidates) < 3 and keywords:
+        candidates = _build_candidates(include_category=True, require_keywords=False)
+        logger.info("Candidates (category only): %d", len(candidates))
+
+    # Relax category if still too few
     if len(candidates) < 3 and category:
-        candidates = _build_candidates(include_category=False)
-
-    # Last resort: top popular locations if still empty
-    if not candidates:
-        candidates = _popularity_query(db).limit(10).all()
+        candidates = _build_candidates(include_category=False, require_keywords=False)
+        logger.info("Candidates (no filters): %d", len(candidates))
 
     if not candidates:
         return []
 
     # ── Step 3: AI re-ranks to ≤5 ────────────────────────────────────────────
     top_ids = filter_locations_by_relevance(body.prompt, candidates)
+    logger.info("AI filter returned IDs: %s", top_ids)
 
     if not top_ids:
         return candidates[:5]

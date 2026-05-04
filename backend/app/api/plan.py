@@ -214,7 +214,7 @@ def create_plan(body: CreatePlanRequest, request: Request, db: Session = Depends
 @plan_router.get("/", response_model=List[PlanSummaryResponse])
 def list_my_plans(request: Request, db: Session = Depends(get_db)):
     user_id = _require_auth(request)
-    plan_ids = db.query(PlanMember.plan_id).filter(PlanMember.user_id == user_id).subquery()
+    plan_ids = db.query(PlanMember.plan_id).filter(PlanMember.user_id == user_id).scalar_subquery()
     return db.query(Plan).filter(Plan.id.in_(plan_ids)).order_by(Plan.created_at.desc()).all()
 
 

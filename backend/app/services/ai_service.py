@@ -1,12 +1,15 @@
 import json
+import logging
 from typing import Optional
 
 import requests
 
 from app.utils.config import config
 
+logger = logging.getLogger(__name__)
+
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+_MODEL = "gpt-oss-120b"
 
 _EXTRACT_SYSTEM = """\
 You are a travel search assistant. Given a user's message, decide if it's asking about \
@@ -33,6 +36,7 @@ No explanation, only JSON."""
 
 def _call_ai(system: str, user_message: str) -> Optional[str]:
     try:
+        logger.info("Calling OpenRouter API with model: %s", _MODEL)
         resp = requests.post(
             _OPENROUTER_URL,
             headers={
@@ -49,9 +53,21 @@ def _call_ai(system: str, user_message: str) -> Optional[str]:
             },
             timeout=30,
         )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
-    except Exception:
+        logger.info("OpenRouter response status: %s", resp.status_code)
+        if not resp.ok:
+            logger.error("OpenRouter error response: %s", resp.text)
+            return None
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        logger.info("OpenRouter raw response: %s", raw)
+        return raw
+    except requests.exceptions.Timeout:
+        logger.error("OpenRouter request timed out")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        logger.error("OpenRouter connection error: %s", e)
+        return None
+    except Exception as e:
+        logger.error("OpenRouter unexpected error: %s", e)
         return None
 
 
@@ -75,10 +91,13 @@ def extract_travel_intent(prompt: str) -> Optional[dict]:
     """Step 1 — parse the user prompt into structured search intent."""
     raw = _call_ai(_EXTRACT_SYSTEM, prompt)
     if not raw:
+        logger.error("extract_travel_intent: AI returned no response")
         return None
     result = _parse_json(raw)
     if isinstance(result, dict):
+        logger.info("extract_travel_intent result: %s", result)
         return result
+    logger.error("extract_travel_intent: failed to parse JSON from raw: %s", raw)
     return None
 
 
