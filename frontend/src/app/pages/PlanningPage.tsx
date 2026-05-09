@@ -636,13 +636,6 @@ export function PlanningPage() {
                   </button>
                 </div>
               </div>
-
-              <div className="print:hidden bg-muted rounded-xl p-5">
-                <h4 className="font-medium mb-2">Frontend-only mode</h4>
-                <p className="text-sm text-muted-foreground">
-                  Your plan is stored in this browser with localStorage. It will survive page refreshes, but it is not shared across devices.
-                </p>
-              </div>
             </div>
           </div>
         )}
