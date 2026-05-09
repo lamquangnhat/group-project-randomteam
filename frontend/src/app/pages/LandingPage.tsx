@@ -1,8 +1,8 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { useNavigate } from "react-router";
 import {
   Globe2,
-  Plane,
   Route,
   ShieldCheck,
   Sparkles,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import roadImage from "../../assets/landing-road.png";
+import travelLogoIcon from "../../assets/travel-logo-icon.png";
+import { authApi } from "../lib/api";
 
 function GoogleIcon() {
   return (
@@ -50,9 +52,12 @@ function FacebookIcon() {
 
 function LogoMark() {
   return (
-    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#00d998] via-[#28e6ad] to-[#087a72] shadow-xl shadow-emerald-500/20 ring-1 ring-white/70">
-      <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-[#ff5a5f] ring-4 ring-white" />
-      <Plane className="h-6 w-6 -rotate-45 text-white drop-shadow" />
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-white shadow-xl shadow-slate-950/10 ring-1 ring-white/70">
+      <img
+        src={travelLogoIcon}
+        alt="Travel Planner logo"
+        className="h-12 w-12 object-contain"
+      />
     </div>
   );
 }
@@ -85,12 +90,15 @@ export function LandingPage() {
     navigate("/home");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (authMode === "signup") {
-      if (!formData.name.trim()) return setError("Name is required");
+      if (!formData.name.trim()) {
+        return setError("Name is required");
+      }
+
       if (formData.password !== formData.confirmPassword) {
         return setError("Passwords do not match");
       }
@@ -99,47 +107,33 @@ export function LandingPage() {
     setLoading(true);
 
     try {
-      const endpoint =
+      const data =
         authMode === "signup"
-          ? "http://127.0.0.1:8000/auth/register"
-          : "http://127.0.0.1:8000/auth/login";
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Authentication failed");
-      }
+          ? await authApi.register(formData.email, formData.password)
+          : await authApi.login(formData.email, formData.password);
 
       localStorage.removeItem("guestMode");
       localStorage.setItem("userEmail", formData.email);
-      window.dispatchEvent(new Event("auth-changed"));
 
       if (data.access_token) {
         localStorage.setItem("token", data.access_token);
       }
 
+      window.dispatchEvent(new Event("auth-changed"));
       navigate("/home");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialLogin = (provider: "google" | "facebook") => {
-    window.location.href = `http://127.0.0.1:8000/auth/${provider}`;
+    setError(
+      provider === "google"
+        ? "Google login needs a real Google ID token before it can call the backend /auth/google endpoint. Use email/password or Guest for now."
+        : "Facebook login is a UI placeholder because the current backend does not include a Facebook auth endpoint yet. Use email/password or Guest for now."
+    );
   };
 
   return (
@@ -151,6 +145,7 @@ export function LandingPage() {
           aria-label="Travel Planner home"
         >
           <LogoMark />
+
           <span>
             <span className="block text-base font-bold leading-tight text-slate-950 sm:text-lg">
               Travel Planner
@@ -168,6 +163,7 @@ export function LandingPage() {
           >
             Sign In
           </button>
+
           <button
             onClick={() => openAuth("signup")}
             className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800"
@@ -191,11 +187,13 @@ export function LandingPage() {
             </div>
 
             <h1 className="text-4xl font-extrabold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl">
-              Discover places, plan trips, and organize your journey in one website
+              Discover places, plan trips, and organize your journey in one
+              website
             </h1>
 
             <p className="mt-7 max-w-xl text-base leading-8 text-slate-200/90">
-              Travel Planner combines destination browsing, trip planning, and a simple AI-style helper so your whole travel flow feels connected.
+              Travel Planner combines destination browsing, trip planning, and a
+              simple AI-style helper so your whole travel flow feels connected.
             </p>
 
             <button
@@ -207,14 +205,16 @@ export function LandingPage() {
             </button>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              {["Destination discovery", "Trip planning", "AI assistant demo"].map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-4 py-2 text-xs font-semibold text-emerald-100"
-                >
-                  {item}
-                </span>
-              ))}
+              {["Destination discovery", "Trip planning", "AI assistant demo"].map(
+                (item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-4 py-2 text-xs font-semibold text-emerald-100"
+                  >
+                    {item}
+                  </span>
+                )
+              )}
             </div>
           </motion.section>
 
@@ -230,6 +230,7 @@ export function LandingPage() {
                 alt="Open road through a red-rock canyon"
                 className="h-72 w-full rounded-[1.35rem] object-cover sm:h-80"
               />
+
               <div className="grid gap-4 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
                 <div>
                   <h2 className="text-lg font-bold text-slate-950">
@@ -239,11 +240,14 @@ export function LandingPage() {
                     Search, compare, and plan from one clean website interface.
                   </p>
                 </div>
+
                 <div className="rounded-2xl bg-emerald-50 px-5 py-4 text-center">
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">
                     Top rated
                   </p>
-                  <p className="mt-1 text-xl font-black text-emerald-700">4.9 / 5</p>
+                  <p className="mt-1 text-xl font-black text-emerald-700">
+                    4.9 / 5
+                  </p>
                 </div>
               </div>
             </div>
@@ -253,9 +257,12 @@ export function LandingPage() {
                 <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
                   <Globe2 className="h-5 w-5" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-950">Discover places faster</h3>
+                <h3 className="text-lg font-bold text-slate-950">
+                  Discover places faster
+                </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                  Hotels, beaches, food, bars, and attractions in one modern layout.
+                  Hotels, beaches, food, bars, and attractions in one modern
+                  layout.
                 </p>
               </div>
 
@@ -263,9 +270,12 @@ export function LandingPage() {
                 <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
                   <Route className="h-5 w-5" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-950">Build your trip easily</h3>
+                <h3 className="text-lg font-bold text-slate-950">
+                  Build your trip easily
+                </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                  Add destinations into your itinerary with a simple interaction flow.
+                  Add destinations into your itinerary with a simple interaction
+                  flow.
                 </p>
               </div>
             </div>
@@ -304,10 +314,12 @@ export function LandingPage() {
 
               <div className="mb-6 flex items-center gap-3">
                 <LogoMark />
+
                 <div>
                   <h2 className="text-2xl font-black text-slate-950">
                     {authMode === "signin" ? "Log in" : "Create account"}
                   </h2>
+
                   <p className="text-sm text-slate-500">
                     {authMode === "signin"
                       ? "Welcome back to Travel Planner."
@@ -415,6 +427,7 @@ export function LandingPage() {
                   ) : (
                     <Star className="h-5 w-5" />
                   )}
+
                   {loading
                     ? "Loading..."
                     : authMode === "signin"
@@ -427,6 +440,7 @@ export function LandingPage() {
                 {authMode === "signin"
                   ? "Don't have an account?"
                   : "Already have an account?"}
+
                 <button
                   onClick={() =>
                     setAuthMode(authMode === "signin" ? "signup" : "signin")
