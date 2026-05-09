@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
-import { Plane } from "lucide-react";
 import { useEffect, useState } from "react";
+import travelLogoIcon from "../../assets/travel-logo-icon.png";
 
 function getSessionEmail() {
   if (typeof window === "undefined") {
@@ -43,6 +43,7 @@ export function Navbar() {
     setSearchQuery(value);
 
     const params = new URLSearchParams(searchParams);
+
     if (value.trim()) {
       params.set("q", value);
     } else {
@@ -50,6 +51,7 @@ export function Navbar() {
     }
 
     const queryString = params.toString();
+
     navigate({
       pathname: "/home",
       search: queryString ? `?${queryString}` : "",
@@ -76,11 +78,17 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           <Link to="/home" className="flex shrink-0 items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#00d998] via-[#28e6ad] to-[#087a72] shadow-sm ring-1 ring-white">
-              <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-[#ff5a5f] ring-2 ring-white" />
-              <Plane className="h-5 w-5 -rotate-45 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+              <img
+                src={travelLogoIcon}
+                alt="Travel Planner logo"
+                className="h-11 w-11 object-contain"
+              />
             </div>
-            <span className="hidden text-xl font-bold text-foreground sm:inline">Travel Planner</span>
+
+            <span className="hidden text-xl font-bold text-foreground sm:inline">
+              Travel Planner
+            </span>
           </Link>
 
           <div className="min-w-44 max-w-sm flex-1 md:max-w-md lg:max-w-lg">
@@ -97,9 +105,11 @@ export function Navbar() {
             <Link to="/home" className={linkClass("/home")}>
               Home
             </Link>
+
             <Link to="/planning" className={linkClass("/planning")}>
               Plan Trip
             </Link>
+
             <Link to="/ai-assistant" className={linkClass("/ai-assistant")}>
               AI Assistant
             </Link>
@@ -109,6 +119,7 @@ export function Navbar() {
                 <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-bold text-emerald-700 md:inline-flex">
                   {sessionEmail}
                 </span>
+
                 <button
                   onClick={handleLogout}
                   className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-slate-900/10 transition hover:bg-slate-800"
