@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import Column, String, DateTime, Integer, Float
+from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 from app.db.base import Base
@@ -11,7 +12,8 @@ class Location(Base):
 
     name = Column(String, index=True)
     description = Column(String, nullable=True)
-
+    image_url = Column(String, nullable=True)
+    
     address = Column(String, nullable=True)
     city = Column(String, index=True)
     country = Column(String, index=True)
@@ -20,10 +22,16 @@ class Location(Base):
     longitude = Column(Float)
 
     category = Column(String)
-    price_level = Column(Integer, nullable=True)  # 1=budget, 2=mid-range, 3=upscale, 4=luxury
-    tags = Column(String, nullable=True)  # comma-separated: "beach,tropical,family,outdoor"
 
     avg_rating = Column(Float, default=0)
     total_reviews = Column(Integer, default=0)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+     # Indexes for search performance
+    __table_args__ = (
+        Index("ix_locations_name_trgm", "name", postgresql_using="gin",
+              postgresql_ops={"name": "gin_trgm_ops"}),
+        Index("ix_locations_description_trgm", "description", postgresql_using="gin",
+              postgresql_ops={"description": "gin_trgm_ops"}),
+    )
