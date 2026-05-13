@@ -5,7 +5,7 @@ import { toast } from "sonner";
 const TRIP_ACTIVITIES_STORAGE_KEY = "travelPlanner.tripActivities";
 
 export interface Destination {
-  id: number;
+  id: string | number;
   name: string;
   category: string;
   image: string;

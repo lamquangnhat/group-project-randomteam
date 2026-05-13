@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -14,35 +14,65 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useTripPlan } from "../context/TripPlanContext";
-import { categories, destinations, type Destination } from "../data/destinations";
+import { locationsApi, adaptLocation, type Destination } from "../lib/api";
+
+const BACKEND_CATEGORIES = [
+  { label: "All", value: "" },
+  { label: "Hotel", value: "hotel" },
+  { label: "Beach", value: "beach" },
+  { label: "Food", value: "food" },
+  { label: "Tourist Attraction", value: "tourist_attraction" },
+  { label: "Mall", value: "mall" },
+  { label: "Nature", value: "nature" },
+  { label: "Entertainment", value: "entertainment" },
+];
 
 export function HomePage() {
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
-  const [likedDestinations, setLikedDestinations] = useState<number[]>([]);
+  const [likedDestinations, setLikedDestinations] = useState<string[]>([]);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [loading, setLoading] = useState(true);
   const { addDestinationToTrip, tripActivities } = useTripPlan();
   const [searchParams] = useSearchParams();
-  const searchQuery = (searchParams.get("q") ?? "").trim().toLowerCase();
+  const searchQuery = (searchParams.get("q") ?? "").trim();
 
-  const filteredDestinations = destinations.filter((destination) => {
-    const matchesCategory =
-      selectedCategory === "All" || destination.category === selectedCategory;
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
 
-    // Search only by title/name or tag/category. Do not search description fields.
-    const matchesSearch =
-      searchQuery === "" ||
-      destination.name.toLowerCase().includes(searchQuery) ||
-      destination.category.toLowerCase().includes(searchQuery);
+    async function fetchDestinations() {
+      try {
+        let raw;
+        if (searchQuery && selectedCategory) {
+          raw = await locationsApi.search({ keyword: searchQuery, category: selectedCategory, limit: 50 });
+        } else if (searchQuery) {
+          raw = await locationsApi.search({ keyword: searchQuery, limit: 50 });
+        } else if (selectedCategory) {
+          raw = await locationsApi.search({ category: selectedCategory, limit: 50 });
+        } else {
+          raw = await locationsApi.getPopular(50);
+        }
+        if (!cancelled) setDestinations(raw.map(adaptLocation));
+      } catch {
+        if (!cancelled) setDestinations([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
 
-    return matchesCategory && matchesSearch;
-  });
+    fetchDestinations();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategory, searchQuery]);
 
-  const favoriteDestinations = destinations.filter((destination) =>
-    likedDestinations.includes(destination.id)
+  const favoriteDestinations = destinations.filter((d) =>
+    likedDestinations.includes(d.id)
   );
 
-  const toggleLike = (id: number) => {
+  const toggleLike = (id: string) => {
     setLikedDestinations((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -80,10 +110,10 @@ export function HomePage() {
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <span className="rounded-full bg-white/12 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20">
-                  {destinations.length}+ places
+                  {destinations.length > 0 ? `${destinations.length}+ places` : "Explore places"}
                 </span>
                 <span className="rounded-full bg-white/12 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20">
-                  {categories.length - 1} travel styles
+                  {BACKEND_CATEGORIES.length - 1} travel styles
                 </span>
                 <span className="rounded-full bg-white/12 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20">
                   Local browser trip plan
@@ -128,17 +158,17 @@ export function HomePage() {
       <div className="sticky top-16 z-40 border-b border-border bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex gap-2 overflow-x-auto py-4">
-            {categories.map((category) => (
+            {BACKEND_CATEGORIES.map((cat) => (
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
+                key={cat.value}
+                onClick={() => setSelectedCategory(cat.value)}
                 className={`whitespace-nowrap rounded-full px-4 py-2 font-semibold transition-all ${
-                  selectedCategory === category
+                  selectedCategory === cat.value
                     ? "bg-slate-950 text-white shadow-md shadow-slate-900/10"
                     : "bg-muted text-foreground hover:bg-emerald-50 hover:text-emerald-700"
                 }`}
               >
-                {category}
+                {cat.label}
               </button>
             ))}
           </div>
@@ -149,20 +179,29 @@ export function HomePage() {
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {searchQuery && (
           <p className="mb-6 rounded-2xl bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm ring-1 ring-border">
-            Showing {filteredDestinations.length} result{filteredDestinations.length === 1 ? "" : "s"} for "{searchParams.get("q")}"
+            Showing {destinations.length} result{destinations.length === 1 ? "" : "s"} for "{searchParams.get("q")}"
           </p>
         )}
 
-        {filteredDestinations.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-72 animate-pulse rounded-2xl bg-muted"
+              />
+            ))}
+          </div>
+        ) : destinations.length === 0 ? (
           <div className="rounded-3xl border border-border bg-card py-16 text-center shadow-sm">
             <h3 className="mb-2 text-xl font-bold">No destinations found</h3>
             <p className="text-muted-foreground">
-              Try searching by destination title or tag, such as Hotel, Beach, Food, or Mountain.
+              Try a different search or category.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {filteredDestinations.map((destination) => (
+            {destinations.map((destination) => (
               <motion.div
                 key={destination.id}
                 initial={{ opacity: 0, scale: 0.94 }}
@@ -223,7 +262,7 @@ export function HomePage() {
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-accent text-accent" />
-                      <span className="text-sm font-semibold">{destination.rating}</span>
+                      <span className="text-sm font-semibold">{destination.rating.toFixed(1)}</span>
                       <span className="text-sm text-muted-foreground">({destination.reviews})</span>
                     </div>
                     <span className="rounded-full bg-muted px-2 py-1 text-sm font-semibold text-muted-foreground">
@@ -342,7 +381,7 @@ export function HomePage() {
                           <div className="mb-3 flex items-center justify-between">
                             <div className="flex items-center gap-1">
                               <Star className="h-4 w-4 fill-accent text-accent" />
-                              <span className="text-sm font-semibold">{destination.rating}</span>
+                              <span className="text-sm font-semibold">{destination.rating.toFixed(1)}</span>
                               <span className="text-sm text-muted-foreground">({destination.reviews})</span>
                             </div>
                             <span className="text-sm font-semibold text-muted-foreground">{destination.price}</span>
@@ -416,7 +455,7 @@ export function HomePage() {
                   <div className="text-right">
                     <div className="mb-1 flex items-center gap-2">
                       <Star className="h-5 w-5 fill-accent text-accent" />
-                      <span className="text-xl font-bold">{selectedDestination.rating}</span>
+                      <span className="text-xl font-bold">{selectedDestination.rating.toFixed(1)}</span>
                     </div>
                     <span className="text-sm text-muted-foreground">{selectedDestination.reviews} reviews</span>
                   </div>
@@ -444,16 +483,18 @@ export function HomePage() {
                   <p className="leading-relaxed text-muted-foreground">{selectedDestination.fullDescription}</p>
                 </div>
 
-                <div className="mb-8">
-                  <h3 className="mb-3 text-xl font-bold">Features & Amenities</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedDestination.features.map((feature, index) => (
-                      <span key={index} className="rounded-full bg-primary/10 px-3 py-1 text-sm text-primary">
-                        {feature}
-                      </span>
-                    ))}
+                {selectedDestination.features.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="mb-3 text-xl font-bold">Tags</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedDestination.features.map((feature, index) => (
+                        <span key={index} className="rounded-full bg-primary/10 px-3 py-1 text-sm text-primary">
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <button
                   onClick={() => {

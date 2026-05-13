@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, MapPin, Compass, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
+import { locationsApi, adaptLocation } from "../lib/api";
 
 interface Message {
   id: number;
@@ -11,37 +12,6 @@ interface Message {
     location: string;
   }>;
 }
-
-const sampleResponses = [
-  {
-    content: "The Maldives is a tropical paradise consisting of 26 atolls in the Indian Ocean. Best time to visit is November to April during the dry season. The islands offer pristine beaches, world-class diving, and luxurious overwater bungalows.",
-    destinations: [{ name: "Maldives", location: "Indian Ocean" }]
-  },
-  {
-    content: "For a 7-day trip to Paris, I recommend: Day 1-2: Eiffel Tower, Louvre Museum, and Seine River cruise. Day 3-4: Versailles Palace, Montmartre, and Sacré-Cœur. Day 5-6: Notre-Dame, Latin Quarter, and Musée d'Orsay. Day 7: Shopping on Champs-Élysées and Arc de Triomphe.",
-    destinations: [
-      { name: "Paris", location: "France" },
-      { name: "Versailles", location: "France" }
-    ]
-  },
-  {
-    content: "Here are the best beaches in Bali: 1) Seminyak Beach - great for surfing and sunset views. 2) Nusa Dua - calm waters perfect for families. 3) Uluwatu - dramatic cliffs and world-class surf breaks. 4) Sanur - peaceful beach with local charm. Each offers unique experiences!",
-    destinations: [
-      { name: "Seminyak Beach", location: "Bali, Indonesia" },
-      { name: "Nusa Dua", location: "Bali, Indonesia" },
-      { name: "Uluwatu", location: "Bali, Indonesia" },
-      { name: "Sanur", location: "Bali, Indonesia" }
-    ]
-  },
-  {
-    content: "Based on your interests, I'd recommend visiting Kyoto for cultural experiences, Osaka for amazing food, and Mount Fuji for natural beauty. The journey between these destinations showcases Japan's efficient rail system and diverse landscapes.",
-    destinations: [
-      { name: "Kyoto", location: "Japan" },
-      { name: "Osaka", location: "Japan" },
-      { name: "Mount Fuji", location: "Japan" }
-    ]
-  }
-];
 
 export function AIAssistancePage() {
   const [messages, setMessages] = useState<Message[]>([
@@ -63,31 +33,45 @@ export function AIAssistancePage() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
-      content: inputValue
+      content: inputValue,
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
+    const prompt = inputValue;
     setInputValue("");
     setIsTyping(true);
 
-    setTimeout(() => {
-      const randomResponse = sampleResponses[Math.floor(Math.random() * sampleResponses.length)];
+    try {
+      const raw = await locationsApi.aiSearch(prompt);
+      const adapted = raw.map(adaptLocation);
+
       const assistantMessage: Message = {
         id: Date.now() + 1,
         role: "assistant",
-        content: randomResponse.content,
-        destinations: randomResponse.destinations
+        content:
+          adapted.length > 0
+            ? `Here are ${adapted.length} place${adapted.length === 1 ? "" : "s"} I found for you:`
+            : "I couldn't find matching destinations for that. Try a different travel-related question.",
+        destinations: adapted.map((d) => ({ name: d.name, location: d.location })),
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch {
+      const errorMessage: Message = {
+        id: Date.now() + 1,
+        role: "assistant",
+        content: "Sorry, I couldn't reach the search service. Please make sure the backend is running and try again.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -264,7 +248,7 @@ export function AIAssistancePage() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            AI responses are simulated. Press Enter to send, Shift+Enter for new line.
+            Powered by backend AI search. Press Enter to send, Shift+Enter for new line.
           </p>
         </div>
       </div>
