@@ -14,11 +14,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
+          "--normal-bg": "#ffffff",
+          "--normal-text": "#0f172a",
+          "--normal-border": "#e2e8f0",
         } as CSSProperties
       }
+      toastOptions={{
+        classNames: {
+          toast: "!bg-white !text-slate-950 !border-slate-200",
+          title: "!text-slate-950 !font-bold",
+          description: "!text-slate-700",
+          actionButton: "!bg-slate-950 !text-white hover:!bg-slate-800",
+        },
+      }}
       {...props}
     />
   );
