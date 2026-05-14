@@ -131,8 +131,8 @@ export function LandingPage() {
   const handleSocialLogin = (provider: "google" | "facebook") => {
     setError(
       provider === "google"
-        ? "Google login needs a real Google ID token before it can call the backend /auth/google endpoint. Use email/password or Guest for now."
-        : "Facebook login is a UI placeholder because the current backend does not include a Facebook auth endpoint yet. Use email/password or Guest for now."
+        ? "Google sign-in needs a real Google ID token before it can call the backend /auth/google endpoint. Use email/password or Guest for now."
+        : "Facebook sign-in is a UI placeholder because the current backend does not include a Facebook auth endpoint yet. Use email/password or Guest for now."
     );
   };
 
@@ -317,7 +317,7 @@ export function LandingPage() {
 
                 <div>
                   <h2 className="text-2xl font-black text-slate-950">
-                    {authMode === "signin" ? "Log in" : "Create account"}
+                    {authMode === "signin" ? "Sign in" : "Create account"}
                   </h2>
 
                   <p className="text-sm text-slate-500">
@@ -431,7 +431,7 @@ export function LandingPage() {
                   {loading
                     ? "Loading..."
                     : authMode === "signin"
-                      ? "Log In"
+                      ? "Sign In"
                       : "Sign Up"}
                 </button>
               </form>
@@ -447,7 +447,7 @@ export function LandingPage() {
                   }
                   className="ml-2 font-bold text-emerald-700 hover:text-emerald-800"
                 >
-                  {authMode === "signin" ? "Sign up" : "Log in"}
+                  {authMode === "signin" ? "Sign up" : "Sign in"}
                 </button>
               </p>
             </motion.div>
