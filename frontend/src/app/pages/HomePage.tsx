@@ -137,16 +137,11 @@ export function HomePage() {
                 </span>
               </button>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
+              <div className="mt-4">
+                <div className="rounded-2xl bg-white/12 p-5 ring-1 ring-white/15">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">Trip Plan</p>
                   <p className="mt-2 text-3xl font-black">{tripActivities.length}</p>
                   <p className="text-xs text-slate-200">places added</p>
-                </div>
-                <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">Quick Add</p>
-                  <p className="mt-2 text-3xl font-black">+</p>
-                  <p className="text-xs text-slate-200">use the plus icon</p>
                 </div>
               </div>
             </div>
