@@ -1,5 +1,6 @@
-import { MapPin, Mail, Phone, Facebook, Instagram, Twitter } from "lucide-react";
+import { Mail, Phone, Facebook, Instagram, Twitter } from "lucide-react";
 import { Link } from "react-router";
+import travelLogoIcon from "../../assets/travel-logo-icon.png";
 
 export function Footer() {
   return (
@@ -8,9 +9,13 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-black" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white">
+                <img
+                  src={travelLogoIcon}
+                  alt="Travel Planner logo"
+                  className="h-8 w-8 object-contain"
+                />
               </div>
               <span className="text-lg font-bold">Travel Planner</span>
             </div>
