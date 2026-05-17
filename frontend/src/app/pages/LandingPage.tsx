@@ -198,9 +198,8 @@ export function LandingPage() {
 
             <button
               onClick={() => openAuth("signup")}
-              className="mt-8 inline-flex items-center justify-center gap-3 rounded-full bg-emerald-400 px-7 py-3.5 text-base font-black text-slate-950 shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:bg-emerald-300"
+              className="mt-8 inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-3.5 text-base font-black text-slate-950 shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:bg-emerald-300"
             >
-              <Star className="h-5 w-5" />
               Sign Up Free
             </button>
 
