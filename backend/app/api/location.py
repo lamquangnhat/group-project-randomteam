@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import or_
+from sqlalchemy import nullslast, or_
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ class LocationResponse(BaseModel):
     category: Optional[str]
     tags: Optional[str]
     price_level: Optional[int]
+    price: Optional[int]
     avg_rating: Optional[float]
     total_reviews: Optional[int]
     created_at: Optional[datetime]
@@ -68,7 +69,6 @@ def get_popular_locations(
     limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """Returns the most popular locations ranked by rating × review count."""
     return _popularity_query(db).limit(limit).all()
 
 
@@ -80,11 +80,13 @@ def search_locations(
     country: Optional[str] = Query(default=None),
     min_rating: Optional[float] = Query(default=None, ge=0, le=5),
     price_level: Optional[int] = Query(default=None, ge=1, le=4, description="1=budget, 2=mid-range, 3=upscale, 4=luxury"),
+    min_price: Optional[int] = Query(default=None, ge=0, description="Minimum price in VND"),
+    max_price: Optional[int] = Query(default=None, ge=0, description="Maximum price in VND"),
+    sort_by: Optional[str] = Query(default=None, description="popular|rating|price_asc|price_desc|newest"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Search and filter locations. All filters are optional and combinable."""
     query = db.query(Location)
 
     if keyword:
@@ -101,25 +103,35 @@ def search_locations(
         query = query.filter(Location.avg_rating >= min_rating)
     if price_level is not None:
         query = query.filter(Location.price_level == price_level)
+    if min_price is not None:
+        query = query.filter(Location.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Location.price <= max_price)
 
-    return (
-        query
-        .order_by(Location.avg_rating.desc(), Location.total_reviews.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    if sort_by == "popular":
+        query = query.order_by(
+            (Location.avg_rating * Location.total_reviews).desc(),
+            Location.avg_rating.desc(),
+        )
+    elif sort_by == "rating":
+        query = query.order_by(Location.avg_rating.desc(), Location.total_reviews.desc())
+    elif sort_by == "price_asc":
+        query = query.order_by(nullslast(Location.price.asc()))
+    elif sort_by == "price_desc":
+        query = query.order_by(nullslast(Location.price.desc()))
+    elif sort_by == "newest":
+        query = query.order_by(Location.created_at.desc())
+    else:
+        query = query.order_by(
+            (Location.avg_rating * Location.total_reviews).desc(),
+            Location.avg_rating.desc(),
+        )
+
+    return query.offset(offset).limit(limit).all()
 
 
 @location_router.post("/ai-search", response_model=List[LocationResponse])
 def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
-    """
-    Natural-language location search powered by AI.
-    Step 1: AI extracts travel intent from the prompt.
-    Step 2: Query DB for up to 10 candidates.
-    Step 3: AI re-ranks and trims to 5 best matches.
-    """
-    # ── Step 1: parse intent ──────────────────────────────────────────────────
     intent = extract_travel_intent(body.prompt)
 
     if not intent or not intent.get("is_travel_related"):
@@ -133,7 +145,6 @@ def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
 
     logger.info("AI intent: category=%s, keywords=%s", category, keywords)
 
-    # ── Step 2: query DB ──────────────────────────────────────────────────────
     def _build_candidates(include_category: bool, require_keywords: bool):
         q = db.query(Location)
         if include_category and category:
@@ -156,16 +167,13 @@ def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
             .all()
         )
 
-    # Try strictest first: category + keywords
     candidates = _build_candidates(include_category=True, require_keywords=True)
     logger.info("Candidates (category+keywords): %d", len(candidates))
 
-    # Relax keywords if too few
     if len(candidates) < 3 and keywords:
         candidates = _build_candidates(include_category=True, require_keywords=False)
         logger.info("Candidates (category only): %d", len(candidates))
 
-    # Relax category if still too few
     if len(candidates) < 3 and category:
         candidates = _build_candidates(include_category=False, require_keywords=False)
         logger.info("Candidates (no filters): %d", len(candidates))
@@ -173,7 +181,6 @@ def ai_search_locations(body: AISearchRequest, db: Session = Depends(get_db)):
     if not candidates:
         return []
 
-    # ── Step 3: AI re-ranks to ≤5 ────────────────────────────────────────────
     top_ids = filter_locations_by_relevance(body.prompt, candidates)
     logger.info("AI filter returned IDs: %s", top_ids)
 

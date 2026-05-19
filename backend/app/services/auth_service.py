@@ -4,7 +4,6 @@ from app.utils import verify_password
 from fastapi import HTTPException
 
 
-# GOOGLE
 def get_or_create_google_user(db: Session, user_info: dict):
     google_id = user_info["sub"]
     email = user_info.get("email")
@@ -30,7 +29,6 @@ def get_or_create_google_user(db: Session, user_info: dict):
         full_name=user_info.get("name"),
     )
 
-# LOCAL
 def register_user(db: Session, email: str, password: str):
     existing = get_user_by_email(db, email)
     if existing:

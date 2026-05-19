@@ -5,7 +5,6 @@ from jose import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
-# Google
 GOOGLE_CLIENT_ID = config.GOOGLE_CLIENT_ID
 
 def verify_google_token(token: str):
@@ -16,7 +15,7 @@ def verify_google_token(token: str):
     )
     return idinfo
 
-# Local
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
@@ -26,7 +25,7 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
-# JWT
+
 def create_jwt(user):
     payload = {
         "user_id": str(user.id),

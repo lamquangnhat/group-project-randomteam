@@ -19,7 +19,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
-// --- Auth ---
 export const authApi = {
   register: (email: string, password: string) =>
     request<{ access_token: string }>("/auth/register", {
@@ -33,7 +32,6 @@ export const authApi = {
     }),
 };
 
-// --- Backend location shape ---
 export interface BackendLocation {
   id: string;
   name: string;
@@ -46,12 +44,12 @@ export interface BackendLocation {
   category: string;
   tags: string;
   price_level: number;
+  price: number | null;
   avg_rating: number;
   total_reviews: number;
   created_at: string;
 }
 
-// --- Frontend destination shape ---
 export interface Destination {
   id: string;
   name: string;
@@ -65,9 +63,11 @@ export interface Destination {
   fullDescription: string;
   features: string[];
   hours: string;
+  latitude?: number;
+  longitude?: number;
 }
 
-const CATEGORY_IMAGES: Record<string, string> = {
+export const CATEGORY_IMAGES: Record<string, string> = {
   hotel: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800",
   beach: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
   food: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
@@ -77,7 +77,12 @@ const CATEGORY_IMAGES: Record<string, string> = {
   entertainment: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800",
 };
 
-const PRICE_LEVELS: Record<number, string> = { 1: "$", 2: "$$", 3: "$$$", 4: "$$$$" };
+const PRICE_LEVELS_VND: Record<number, string> = {
+  1: "< 100.000 ₫",
+  2: "100.000–500.000 ₫",
+  3: "500.000–2.000.000 ₫",
+  4: "> 2.000.000 ₫",
+};
 
 export const CATEGORY_LABELS: Record<string, string> = {
   hotel: "Hotel",
@@ -100,26 +105,49 @@ export function adaptLocation(loc: BackendLocation): Destination {
     rating: loc.avg_rating,
     reviews: loc.total_reviews,
     location: [loc.city, loc.country].filter(Boolean).join(", "),
-    price: PRICE_LEVELS[loc.price_level] ?? "$",
+    price: loc.price != null
+      ? loc.price.toLocaleString("vi-VN") + " ₫"
+      : PRICE_LEVELS_VND[loc.price_level] ?? "Liên hệ",
     description: loc.description,
     fullDescription: loc.description,
     features: loc.tags
       ? loc.tags.split(",").map((t) => t.trim()).filter(Boolean)
       : [],
     hours: "Contact location for hours",
+    latitude: loc.latitude ?? undefined,
+    longitude: loc.longitude ?? undefined,
   };
 }
 
-// --- Locations API ---
 export const locationsApi = {
   getPopular: (limit = 50) =>
     request<BackendLocation[]>(`/locations/popular?limit=${limit}`),
 
-  search: (params: { keyword?: string; category?: string; limit?: number } = {}) => {
+  search: (params: {
+    keyword?: string;
+    category?: string;
+    city?: string;
+    country?: string;
+    min_rating?: number;
+    price_level?: number;
+    min_price?: number;
+    max_price?: number;
+    sort_by?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
     const qs = new URLSearchParams();
     if (params.keyword) qs.set("keyword", params.keyword);
     if (params.category) qs.set("category", params.category);
+    if (params.city) qs.set("city", params.city);
+    if (params.country) qs.set("country", params.country);
+    if (params.min_rating != null) qs.set("min_rating", String(params.min_rating));
+    if (params.price_level != null) qs.set("price_level", String(params.price_level));
+    if (params.min_price != null) qs.set("min_price", String(params.min_price));
+    if (params.max_price != null) qs.set("max_price", String(params.max_price));
+    if (params.sort_by) qs.set("sort_by", params.sort_by);
     if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.offset != null) qs.set("offset", String(params.offset));
     return request<BackendLocation[]>(`/locations/search?${qs}`);
   },
 

@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useEffect, useState } from "react";
-import travelLogoIcon from "../../assets/travel-logo-icon.png";
+
 
 function getSessionEmail() {
   if (typeof window === "undefined") {
@@ -80,15 +80,12 @@ export function Navbar() {
           <Link to="/home" className="flex shrink-0 items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
               <img
-                src={travelLogoIcon}
+                src="/logo.png"
                 alt="Travel Planner logo"
                 className="h-11 w-11 object-contain"
               />
             </div>
 
-            <span className="hidden text-xl font-bold text-foreground sm:inline">
-              Travel Planner
-            </span>
           </Link>
 
           <div className="min-w-44 max-w-sm flex-1 md:max-w-md lg:max-w-lg">

@@ -16,8 +16,6 @@ from app.services.database import get_db
 plan_router = APIRouter(prefix="/plans", tags=["Plans"])
 
 
-# ── Request Schemas ───────────────────────────────────────────────────────────
-
 class CreatePlanRequest(BaseModel):
     title: str
     description: Optional[str] = None
@@ -34,7 +32,7 @@ class UpdatePlanRequest(BaseModel):
 
 class AddMemberRequest(BaseModel):
     user_email: str
-    role: str = "editor"  # "editor" or "viewer"
+    role: str = "editor"
 
 
 class CreateActivityRequest(BaseModel):
@@ -54,8 +52,6 @@ class UpdateActivityRequest(BaseModel):
     notes: Optional[str] = None
     order_index: Optional[int] = None
 
-
-# ── Response Schemas ──────────────────────────────────────────────────────────
 
 class LocationBrief(BaseModel):
     id: uuid.UUID
@@ -117,8 +113,6 @@ class PlanDetailResponse(BaseModel):
     members: List[MemberResponse]
     days: List[DayResponse]
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _require_auth(request: Request) -> uuid.UUID:
     user = request.state.user
@@ -190,8 +184,6 @@ def _get_members(plan_id: uuid.UUID, db: Session) -> List[MemberResponse]:
         for m, u in rows
     ]
 
-
-# ── Plan CRUD ─────────────────────────────────────────────────────────────────
 
 @plan_router.post("/", response_model=PlanSummaryResponse, status_code=status.HTTP_201_CREATED)
 def create_plan(body: CreatePlanRequest, request: Request, db: Session = Depends(get_db)):
@@ -279,8 +271,6 @@ def delete_plan(plan_id: uuid.UUID, request: Request, db: Session = Depends(get_
     db.commit()
 
 
-# ── Member Management ─────────────────────────────────────────────────────────
-
 @plan_router.post("/{plan_id}/members", response_model=MemberResponse, status_code=status.HTTP_201_CREATED)
 def add_member(plan_id: uuid.UUID, body: AddMemberRequest, request: Request, db: Session = Depends(get_db)):
     user_id = _require_auth(request)
@@ -337,8 +327,6 @@ def remove_member(
     db.delete(target_membership)
     db.commit()
 
-
-# ── Activity Management ───────────────────────────────────────────────────────
 
 @plan_router.post("/{plan_id}/activities", response_model=ActivityResponse, status_code=status.HTTP_201_CREATED)
 def add_activity(plan_id: uuid.UUID, body: CreateActivityRequest, request: Request, db: Session = Depends(get_db)):

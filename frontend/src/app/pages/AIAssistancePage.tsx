@@ -1,16 +1,234 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, MapPin, Compass, Sparkles } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { Send, MapPin, Compass, Sparkles, Plus, ChevronDown, Check } from "lucide-react";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 import { locationsApi, adaptLocation } from "../lib/api";
+import { useTripPlan, type Destination, type TripActivity } from "../context/TripPlanContext";
+import { LocationMap } from "../components/LocationMap";
+
+interface AIDest {
+  name: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+}
 
 interface Message {
   id: number;
   role: "user" | "assistant";
   content: string;
-  destinations?: Array<{
-    name: string;
-    location: string;
-  }>;
+  destinations?: AIDest[];
+}
+
+interface SavedPlan {
+  id: string;
+  title: string;
+  activities: TripActivity[];
+}
+
+const PLANS_KEY = "travelPlanner.plans";
+
+const SUGGESTED = [
+  "What are the best beaches in Vietnam?",
+  "Plan a 3-day trip to Hoi An",
+  "Budget travel tips for Southeast Asia",
+  "Top tourist attractions in Hanoi",
+];
+
+function readPlans(): SavedPlan[] {
+  try {
+    const v = localStorage.getItem(PLANS_KEY);
+    return v ? JSON.parse(v) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePlans(plans: SavedPlan[]) {
+  localStorage.setItem(PLANS_KEY, JSON.stringify(plans));
+}
+
+function PlanPicker({
+  dest,
+  plans,
+  addedPlanIds,
+  onAddToStaging,
+  onAddToPlan,
+  onClose,
+}: {
+  dest: AIDest;
+  plans: SavedPlan[];
+  addedPlanIds: Set<string>;
+  onAddToStaging: () => void;
+  onAddToPlan: (planId: string, planTitle: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-full z-20 mt-1.5 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+    >
+      <div className="border-b border-slate-100 px-3 py-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Add to…</p>
+      </div>
+      <div className="max-h-52 overflow-y-auto py-1">
+        <button
+          onClick={() => { onAddToStaging(); onClose(); }}
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
+        >
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+            <Plus className="h-3.5 w-3.5" />
+          </div>
+          <span className="flex-1 text-left font-medium">Staging Area</span>
+        </button>
+
+        {plans.length > 0 && (
+          <div className="mx-3 my-1 border-t border-slate-100" />
+        )}
+
+        {plans.map((plan) => {
+          const added = addedPlanIds.has(plan.id);
+          return (
+            <button
+              key={plan.id}
+              onClick={() => { if (!added) { onAddToPlan(plan.id, plan.title); onClose(); } }}
+              disabled={added}
+              className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition ${
+                added
+                  ? "cursor-default text-slate-400"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${added ? "bg-emerald-100" : "bg-slate-100"}`}>
+                {added ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                ) : (
+                  <MapPin className="h-3.5 w-3.5 text-slate-500" />
+                )}
+              </div>
+              <span className="flex-1 truncate text-left font-medium">{plan.title}</span>
+            </button>
+          );
+        })}
+
+        {plans.length === 0 && (
+          <p className="px-3 py-3 text-xs text-slate-400">
+            No plans yet — create one on the Planning page.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DestCard({
+  dest,
+  rank,
+  plans,
+}: {
+  dest: AIDest;
+  rank: number;
+  plans: SavedPlan[];
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [addedPlanIds, setAddedPlanIds] = useState<Set<string>>(new Set());
+  const [addedToStaging, setAddedToStaging] = useState(false);
+  const { addDestinationToTrip } = useTripPlan();
+
+  const handleAddToStaging = useCallback(() => {
+    const stagingDest: Destination = {
+      id: Date.now(),
+      name: dest.name,
+      category: "Activity",
+      image: "",
+      rating: 0,
+      reviews: 0,
+      location: dest.location,
+      price: "Free",
+      description: "",
+      fullDescription: "",
+      features: [],
+      hours: "",
+    };
+    addDestinationToTrip(stagingDest);
+    setAddedToStaging(true);
+  }, [dest, addDestinationToTrip]);
+
+  const handleAddToPlan = useCallback((planId: string, planTitle: string) => {
+    const currentPlans = readPlans();
+    const newActivity: TripActivity = {
+      id: Date.now(),
+      name: dest.name,
+      category: "Activity",
+      date: "",
+      time: "09:00",
+      cost: null,
+      location: dest.location,
+      notes: "",
+      duration: "2 hours",
+    };
+    const updated = currentPlans.map((p) =>
+      p.id === planId ? { ...p, activities: [...p.activities, newActivity] } : p
+    );
+    writePlans(updated);
+    setAddedPlanIds((prev) => new Set([...prev, planId]));
+    toast.success(`Added "${dest.name}" to "${planTitle}"`);
+  }, [dest]);
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+        <MapPin className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-bold text-slate-900">{dest.name}</p>
+        <p className="truncate text-xs text-slate-500">{dest.location}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">
+        #{rank}
+      </span>
+
+      <div className="relative shrink-0">
+        <button
+          onClick={() => setPickerOpen((o) => !o)}
+          className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+            addedToStaging || addedPlanIds.size > 0
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-emerald-500 text-white hover:bg-emerald-600"
+          }`}
+        >
+          {addedToStaging || addedPlanIds.size > 0 ? (
+            <Check className="h-3 w-3" />
+          ) : (
+            <Plus className="h-3 w-3" />
+          )}
+          Add
+          <ChevronDown className="h-3 w-3" />
+        </button>
+
+        {pickerOpen && (
+          <PlanPicker
+            dest={dest}
+            plans={plans}
+            addedPlanIds={addedPlanIds}
+            onAddToStaging={handleAddToStaging}
+            onAddToPlan={handleAddToPlan}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function AIAssistancePage() {
@@ -18,118 +236,139 @@ export function AIAssistancePage() {
     {
       id: 1,
       role: "assistant",
-      content: "Hello! I'm your AI travel assistant. Ask me anything about destinations, travel tips, itineraries, or local recommendations. I can also show you maps to help visualize your journey!"
-    }
+      content:
+        "Hi! I'm your AI travel assistant. Ask me about destinations, itineraries, local tips, or anything travel-related and I'll find matching places for you.",
+    },
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [plans, setPlans] = useState<SavedPlan[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
+  const lastMapLocations = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role === "assistant" && msg.destinations?.length) {
+        return msg.destinations
+          .filter((d) => d.latitude && d.longitude)
+          .map((d, idx) => ({
+            id: idx,
+            name: d.name,
+            latitude: d.latitude!,
+            longitude: d.longitude!,
+            category: d.location,
+          }));
+      }
+    }
+    return [];
   }, [messages]);
 
-  const handleSendMessage = async () => {
+  useEffect(() => {
+    setPlans(readPlans());
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
 
-    const userMessage: Message = {
-      id: Date.now(),
-      role: "user",
-      content: inputValue,
-    };
-
+    const userMessage: Message = { id: Date.now(), role: "user", content: inputValue };
     setMessages((prev) => [...prev, userMessage]);
     const prompt = inputValue;
     setInputValue("");
     setIsTyping(true);
 
+    setPlans(readPlans());
+
     try {
       const raw = await locationsApi.aiSearch(prompt);
       const adapted = raw.map(adaptLocation);
-
-      const assistantMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content:
-          adapted.length > 0
-            ? `Here are ${adapted.length} place${adapted.length === 1 ? "" : "s"} I found for you:`
-            : "I couldn't find matching destinations for that. Try a different travel-related question.",
-        destinations: adapted.map((d) => ({ name: d.name, location: d.location })),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content:
+            adapted.length > 0
+              ? `Here ${adapted.length === 1 ? "is" : "are"} ${adapted.length} place${adapted.length === 1 ? "" : "s"} I found for you:`
+              : "I couldn't find matching destinations for that. Try rephrasing or ask about a specific city or activity.",
+          destinations: adapted.map((d) => ({
+            name: d.name,
+            location: d.location,
+            latitude: d.latitude,
+            longitude: d.longitude,
+          })),
+        },
+      ]);
     } catch {
-      const errorMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: "Sorry, I couldn't reach the search service. Please make sure the backend is running and try again.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content:
+            "Sorry, I couldn't reach the search service. Please make sure the backend is running and try again.",
+        },
+      ]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSend();
     }
   };
 
-  const suggestedQuestions = [
-    "What are the best beaches in Bali?",
-    "Plan a 7-day trip to Paris",
-    "Budget travel tips for Southeast Asia",
-    "Best time to visit the Maldives"
-  ];
-
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-[radial-gradient(circle_at_12%_25%,#46e6b4_0%,transparent_28%),radial-gradient(circle_at_88%_10%,#75c7ff_0%,transparent_25%),linear-gradient(135deg,#071827_0%,#173a58_55%,#0f6170_100%)] px-4 py-8 text-white shadow-md sm:px-6 lg:px-8">
-        <div className="absolute -left-20 top-4 h-52 w-52 rounded-full bg-emerald-300/20 blur-3xl" />
-        <div className="absolute right-10 top-4 h-32 w-32 rounded-full bg-sky-300/20 blur-3xl" />
-        <div className="relative mx-auto max-w-5xl">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/25">
-                <Sparkles className="h-7 w-7" />
-              </div>
-              <div>
-                <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-50 ring-1 ring-white/15">
-                  <Compass className="h-3.5 w-3.5 text-emerald-300" />
-                  Smart travel ideas
-                </div>
-                <h1 className="text-3xl font-black tracking-tight">AI Travel Assistant</h1>
-                <p className="text-sm text-slate-100/85">Your personal guide to exploring the world</p>
-              </div>
+    <div className="flex h-[calc(100vh-4rem)] flex-col bg-slate-50">
+
+      <div className="border-b border-slate-200 bg-white px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 shadow-md shadow-emerald-500/25">
+              <Sparkles className="h-6 w-6 text-white" />
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-sm text-slate-100 shadow-lg backdrop-blur">
-              Ask for itineraries, beaches, food spots, budgets, or destination tips.
+            <div>
+              <p className="mb-0.5 text-xs font-bold uppercase tracking-widest text-emerald-600">
+                AI-powered
+              </p>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                Travel Assistant
+              </h1>
             </div>
+          </div>
+          <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500 sm:block">
+            <Compass className="mb-0.5 mr-1.5 inline h-4 w-4 text-emerald-500" />
+            Ask for itineraries, beaches, food spots, or destination tips
           </div>
         </div>
       </div>
 
-      {/* Chat Container */}
+      <div className="flex flex-1 min-h-0">
+
+        <div className="flex flex-1 flex-col min-h-0">
+
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+
           {messages.length === 1 && (
             <div className="mb-8">
-              <p className="text-muted-foreground text-sm mb-4">Try asking:</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {suggestedQuestions.map((question, index) => (
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                Try asking
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {SUGGESTED.map((q) => (
                   <button
-                    key={index}
-                    onClick={() => setInputValue(question)}
-                    className="text-left px-4 py-3 bg-card rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-colors text-sm"
+                    key={q}
+                    onClick={() => setInputValue(q)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
                   >
-                    {question}
+                    {q}
                   </button>
                 ))}
               </div>
@@ -142,60 +381,45 @@ export function AIAssistancePage() {
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                transition={{ duration: 0.25 }}
+                className={`flex items-end gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
               >
-                {message.role === 'assistant' && (
-                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-5 h-5 text-black" />
+                {message.role === "assistant" ? (
+                  <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-sm">
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                ) : (
+                  <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f273e]">
+                    <span className="text-xs font-bold text-emerald-400">You</span>
                   </div>
                 )}
 
-                <div className={`flex flex-col gap-3 ${message.role === 'user' ? 'items-end' : 'items-start'} max-w-3xl`}>
+                <div
+                  className={`flex max-w-2xl flex-col gap-3 ${message.role === "user" ? "items-end" : "items-start"}`}
+                >
                   <div
-                    className={`px-5 py-3 rounded-2xl ${
-                      message.role === 'user'
-                        ? 'bg-primary text-black'
-                        : 'bg-card border border-border'
+                    className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                      message.role === "user"
+                        ? "bg-emerald-500 text-white"
+                        : "border border-slate-200 bg-white text-slate-800 shadow-sm"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                    <p className="whitespace-pre-wrap">{message.content}</p>
                   </div>
 
                   {message.destinations && message.destinations.length > 0 && (
-                    <div className="w-full max-w-2xl space-y-3">
-                      {message.destinations.map((destination, index) => (
-                        <div key={index} className="bg-card rounded-xl overflow-hidden border border-border shadow-md">
-                          <div className="bg-muted px-4 py-2 border-b border-border flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-primary" />
-                            <span className="text-sm">{destination.name}</span>
-                            <span className="text-xs text-muted-foreground ml-auto">{destination.location}</span>
-                          </div>
-                          <div className="aspect-video bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center relative overflow-hidden">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <Compass className="w-16 h-16 text-primary/20" />
-                            </div>
-                            <div className="relative z-10 text-center p-8">
-                              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
-                                <MapPin className="w-6 h-6 text-black" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">Interactive map view</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                (Map integration would show {destination.name} here)
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                    <div className="w-full space-y-2">
+                      {message.destinations.map((dest, i) => (
+                        <DestCard
+                          key={i}
+                          dest={dest}
+                          rank={i + 1}
+                          plans={plans}
+                        />
                       ))}
                     </div>
                   )}
                 </div>
-
-                {message.role === 'user' && (
-                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                    <div className="w-6 h-6 bg-primary rounded-full"></div>
-                  </div>
-                )}
               </motion.div>
             ))}
 
@@ -203,16 +427,20 @@ export function AIAssistancePage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4 justify-start"
+                className="flex items-end gap-3"
               >
-                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-5 h-5 text-black" />
+                <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-sm">
+                  <Sparkles className="h-4 w-4 text-white" />
                 </div>
-                <div className="px-5 py-3 rounded-2xl bg-card border border-border">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm">
+                  <div className="flex gap-1.5">
+                    {[0, 150, 300].map((delay) => (
+                      <div
+                        key={delay}
+                        className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce"
+                        style={{ animationDelay: `${delay}ms` }}
+                      />
+                    ))}
                   </div>
                 </div>
               </motion.div>
@@ -223,34 +451,52 @@ export function AIAssistancePage() {
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-border bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="border-t border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
           <div className="flex gap-3">
             <textarea
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask me anything about travel destinations, tips, or planning..."
-              className="flex-1 px-4 py-3 bg-input-background rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about destinations, itineraries, travel tips..."
               rows={1}
-              style={{
-                minHeight: '48px',
-                maxHeight: '120px'
-              }}
+              style={{ minHeight: "48px", maxHeight: "120px" }}
+              className="flex-1 resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
             />
             <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim()}
-              className="px-6 py-3 bg-primary text-black rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isTyping}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md shadow-emerald-500/20 transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Send"
             >
-              <Send className="w-5 h-5" />
+              <Send className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Powered by backend AI search. Press Enter to send, Shift+Enter for new line.
+          <p className="mt-2 text-center text-xs text-slate-400">
+            Press Enter to send · Shift + Enter for a new line
           </p>
         </div>
+      </div>
+
+        </div>
+
+        {lastMapLocations.length > 0 && (
+          <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white lg:flex lg:flex-col">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <p className="font-black text-slate-900">Locations</p>
+              <p className="text-xs text-slate-400">
+                {lastMapLocations.length} place{lastMapLocations.length !== 1 ? "s" : ""} found
+              </p>
+            </div>
+            <div className="flex-1 min-h-0">
+              <LocationMap
+                locations={lastMapLocations}
+                style={{ height: "100%" }}
+              />
+            </div>
+          </aside>
+        )}
+
       </div>
     </div>
   );

@@ -23,12 +23,15 @@ export interface TripActivity {
   id: number;
   name: string;
   category: string;
+  image?: string;
   date: string;
   time: string;
   cost: number | null;
   location: string;
   notes: string;
   duration: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface TripPlanContextType {
@@ -106,12 +109,15 @@ export function TripPlanProvider({ children }: { children: ReactNode }) {
       id: Date.now(),
       name: destination.name,
       category: destination.category,
+      image: destination.image,
       date: getTodayDate(),
       time: "09:00",
       cost: null,
       location: destination.location,
       notes: "",
       duration: "2 hours",
+      latitude: destination.latitude,
+      longitude: destination.longitude,
     };
 
     setTripActivities((prevActivities) => [...prevActivities, newActivity]);

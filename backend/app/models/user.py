@@ -15,7 +15,7 @@ class User(Base):
     full_name = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True)
 
-    provider = Column(String, nullable=True)  # "local", "google", etc.
+    provider = Column(String, nullable=True)
     provider_id = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)

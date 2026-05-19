@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import { LandingPage } from "./pages/LandingPage";
 import { HomePage } from "./pages/HomePage";
+import { FavoritesPage } from "./pages/FavoritesPage";
 import { PlanningPage } from "./pages/PlanningPage";
 import { AIAssistancePage } from "./pages/AIAssistancePage";
 import { RootLayout } from "./layouts/RootLayout";
@@ -16,6 +17,10 @@ export const router = createBrowserRouter([
       {
         path: "/home",
         element: <HomePage />,
+      },
+      {
+        path: "/favorites",
+        element: <FavoritesPage />,
       },
       {
         path: "/planning",

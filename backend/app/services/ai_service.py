@@ -75,7 +75,6 @@ def _parse_json(raw: str) -> Optional[object]:
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        # Model sometimes wraps JSON in markdown; try to extract it
         for start_ch, end_ch in [('{', '}'), ('[', ']')]:
             s = raw.find(start_ch)
             e = raw.rfind(end_ch) + 1
@@ -88,7 +87,6 @@ def _parse_json(raw: str) -> Optional[object]:
 
 
 def extract_travel_intent(prompt: str) -> Optional[dict]:
-    """Step 1 — parse the user prompt into structured search intent."""
     raw = _call_ai(_EXTRACT_SYSTEM, prompt)
     if not raw:
         logger.error("extract_travel_intent: AI returned no response")
@@ -102,7 +100,6 @@ def extract_travel_intent(prompt: str) -> Optional[dict]:
 
 
 def filter_locations_by_relevance(prompt: str, locations: list) -> list[str]:
-    """Step 2 — ask AI to rank and trim the candidate list down to ≤5 IDs."""
     if not locations:
         return []
 
